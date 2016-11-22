@@ -123,7 +123,6 @@ public class LLNetworkManager : MonoBehaviour
 
     protected virtual void Update()
     {
-
         if (socketId == -1)
             return;
 
@@ -275,22 +274,22 @@ public class LLNetworkManager : MonoBehaviour
 
     protected virtual void OnServerConnect(LLNetworkConnection connection)
     {
-        Debug.Log("OnClientConnect " + name + " " + connection.ConnectionId);
+        Debug.Log("OnServerConnect " + name + " " + connection.ConnectionId);
     }
 
     protected virtual void OnClientConnect(LLNetworkConnection connection)
     {
-        Debug.Log("OnServerConnect " + name + " " + connection.ConnectionId);
+        Debug.Log("OnClientConnect " + name + " " + connection.ConnectionId);
     }
 
     protected virtual void OnServerDisconnect(LLNetworkConnection connection)
     {
-        Debug.Log("OnClientDisconnect " + name + " " + connection.ConnectionId);
+        Debug.Log("OnServerDisconnect " + name + " " + connection.ConnectionId);
     }
 
     protected virtual void OnClientDisconnect(LLNetworkConnection connection)
     {
-        Debug.Log("OnServerDisconnect " + name + " " + connection.ConnectionId);
+        Debug.Log("OnClientDisconnect " + name + " " + connection.ConnectionId);
     }
 
     protected virtual void OnStartHost()
