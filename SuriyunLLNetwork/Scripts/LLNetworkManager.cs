@@ -36,19 +36,27 @@ public class LLNetworkManager : MonoBehaviour
     public void StartServer()
     {
         NetworkTransport.Init();
-        IsClientConnecting = true;
+        IsClientConnecting = false;
         IsServer = true;
         socketId = useWebSockets ? NetworkTransport.AddWebsocketHost(CreateTopology(), networkPort) :  NetworkTransport.AddHost(CreateTopology(), networkPort);
         msgBuffer = new byte[NetworkMessage.MaxMessageSize];
         ClientConnections = new Dictionary<int, LLNetworkConnection>();
+        OnStartServer();
     }
 
-    public void Connect()
+    public void StartHost()
     {
-        Connect(networkAddress, networkPort);
+        StartServer();
+        IsClientConnecting = true;
+        OnStartHost();
     }
 
-    public void Connect(string address, int port)
+    public void StartClient()
+    {
+        StartClient(networkAddress, networkPort);
+    }
+
+    public void StartClient(string address, int port)
     {
         NetworkTransport.Init();
         networkAddress = address;
@@ -57,6 +65,31 @@ public class LLNetworkManager : MonoBehaviour
         IsServer = false;
         socketId = useWebSockets ? NetworkTransport.AddWebsocketHost(CreateTopology(), 0) :  NetworkTransport.AddHost(CreateTopology(), 0);
         msgBuffer = new byte[NetworkMessage.MaxMessageSize];
+        OnStartClient();
+    }
+
+    public void StopServer()
+    {
+        NetworkTransport.RemoveHost(SocketId);
+        OnStopServer();
+    }
+
+    public void StopHost()
+    {
+        byte error;
+        NetworkTransport.Disconnect(SocketId, ConnectionId, out error);
+        StopServer();
+        HandleDisconnect(ConnectionId, error);
+        OnStopHost();
+    }
+
+    public void StopClient()
+    {
+        byte error;
+        NetworkTransport.Disconnect(SocketId, ConnectionId, out error);
+        NetworkTransport.RemoveHost(SocketId);
+        HandleDisconnect(ConnectionId, error);
+        OnStopClient();
     }
 
     public void SetClientConnectingStates()
@@ -82,32 +115,10 @@ public class LLNetworkManager : MonoBehaviour
         connectionId = -1;
     }
 
-    public void StopServer()
-    {
-        byte error;
-        NetworkTransport.Disconnect(SocketId, ConnectionId, out error);
-        NetworkTransport.RemoveHost(SocketId);
-        HandleDisconnect(ConnectionId, error);
-    }
-
-    public void Disconnect()
-    {
-        if (IsServer)
-        {
-            StopServer();
-            return;
-        }
-        
-        byte error;
-        NetworkTransport.Disconnect(SocketId, ConnectionId, out error);
-        NetworkTransport.RemoveHost(SocketId);
-        HandleDisconnect(ConnectionId, error);
-    }
-
     public void Reconnect()
     {
-        Disconnect();
-        Connect();
+        StopClient();
+        StartClient();
     }
 
     protected virtual void Update()
@@ -128,6 +139,7 @@ public class LLNetworkManager : MonoBehaviour
                 // Timeout reached
                 SetClientDisconnectStates();
                 countConnectingTime = 0;
+                OnConnectionTimeOut();
                 return;
             }
 
@@ -141,8 +153,6 @@ public class LLNetworkManager : MonoBehaviour
                     SetClientDisconnectStates();
                     return;
                 }
-
-                Debug.Log("New Server Connection Created " + name + " " + connectionId);
             }
         }
 
@@ -155,15 +165,12 @@ public class LLNetworkManager : MonoBehaviour
         switch (incomingNetworkEvent)
         {
             case NetworkEventType.ConnectEvent:
-                Debug.Log("NetworkEventType.ConnectEvent " + name + " " + incomingConnectionId);
                 HandleConnect(incomingConnectionId, error);
                 break;
             case NetworkEventType.DataEvent:
-                Debug.Log("NetworkEventType.DataEvent " + name + " " + incomingConnectionId);
                 HandleData(incomingConnectionId, incomingChannelId, incomingReceivedSize, error);
                 break;
             case NetworkEventType.DisconnectEvent:
-                Debug.Log("NetworkEventType.DisconnectEvent " + name + " " + incomingConnectionId);
                 HandleDisconnect(incomingConnectionId, error);
                 break;
             case NetworkEventType.Nothing:
@@ -179,12 +186,12 @@ public class LLNetworkManager : MonoBehaviour
             {
                 LLNetworkConnection newConnection = new LLNetworkConnection(clientConnectionId, SocketId);
                 ClientConnections.Add(clientConnectionId, newConnection);
-                OnClientConnect(newConnection);
+                OnServerConnect(newConnection);
             }
             else
             {
                 ServerConnection = new LLNetworkConnection(clientConnectionId, SocketId);
-                OnServerConnect(ServerConnection);
+                OnClientConnect(ServerConnection);
                 SetClientConnectedStates();
             }
         }
@@ -194,7 +201,7 @@ public class LLNetworkManager : MonoBehaviour
                 return;
 
             ServerConnection = new LLNetworkConnection(clientConnectionId, SocketId);
-            OnServerConnect(ServerConnection);
+            OnClientConnect(ServerConnection);
             SetClientConnectedStates();
         }
     }
@@ -242,13 +249,14 @@ public class LLNetworkManager : MonoBehaviour
 
                 // Disconnect all client
                 connection.Disconnect();
-                OnClientDisconnect(connection);
+                OnServerDisconnect(connection);
                 ClientConnections.Remove(clientConnectionId);
             }
             else
             {
                 // Disconnect local client
-                OnServerDisconnect(ServerConnection);
+                if (ServerConnection != null)
+                    OnClientDisconnect(ServerConnection);
                 ServerConnection = null;
                 SetClientDisconnectStates();
             }
@@ -257,30 +265,66 @@ public class LLNetworkManager : MonoBehaviour
         {
             if (ConnectionId != clientConnectionId)
                 return;
-            
-            OnServerDisconnect(ServerConnection);
+
+            if (ServerConnection != null)
+                OnClientDisconnect(ServerConnection);
             ServerConnection = null;
             SetClientDisconnectStates();
         }
     }
 
-    protected virtual void OnClientConnect(LLNetworkConnection connection)
+    protected virtual void OnServerConnect(LLNetworkConnection connection)
     {
         Debug.Log("OnClientConnect " + name + " " + connection.ConnectionId);
     }
 
-    protected virtual void OnServerConnect(LLNetworkConnection connection)
+    protected virtual void OnClientConnect(LLNetworkConnection connection)
     {
         Debug.Log("OnServerConnect " + name + " " + connection.ConnectionId);
     }
 
-    protected virtual void OnClientDisconnect(LLNetworkConnection connection)
+    protected virtual void OnServerDisconnect(LLNetworkConnection connection)
     {
         Debug.Log("OnClientDisconnect " + name + " " + connection.ConnectionId);
     }
 
-    protected virtual void OnServerDisconnect(LLNetworkConnection connection)
+    protected virtual void OnClientDisconnect(LLNetworkConnection connection)
     {
         Debug.Log("OnServerDisconnect " + name + " " + connection.ConnectionId);
+    }
+
+    protected virtual void OnStartHost()
+    {
+
+    }
+
+    protected virtual void OnStartServer()
+    {
+
+    }
+
+    protected virtual void OnStartClient()
+    {
+
+    }
+
+    protected virtual void OnStopHost()
+    {
+
+    }
+
+    protected virtual void OnStopServer()
+    {
+
+    }
+
+    protected virtual void OnStopClient()
+    {
+
+    }
+
+    protected virtual void OnConnectionTimeOut()
+    {
+
     }
 }
