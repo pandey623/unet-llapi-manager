@@ -215,14 +215,14 @@ public class LLNetworkManager : MonoBehaviour
                 ClientConnections.TryGetValue(clientConnectionId, out connection);
 
                 if (connection != null)
-                    connection.HandleDataReceived(msgBuffer, 0);
+                    OnData(connection, channelId, receivedSize);
             }
             else
             {
                 if (ServerConnection == null)
                     return;
 
-                ServerConnection.HandleDataReceived(msgBuffer, 0);
+                OnData(ServerConnection, channelId, receivedSize);
             }
         }
         else
@@ -230,7 +230,7 @@ public class LLNetworkManager : MonoBehaviour
             if (ServerConnection == null)
                 return;
 
-            ServerConnection.HandleDataReceived(msgBuffer, 0);
+            OnData(ServerConnection, channelId, receivedSize);
         }
     }
 
@@ -290,6 +290,15 @@ public class LLNetworkManager : MonoBehaviour
     protected virtual void OnClientDisconnect(LLNetworkConnection connection)
     {
         Debug.Log("OnClientDisconnect " + name + " " + connection.ConnectionId);
+    }
+
+    protected virtual void OnData(LLNetworkConnection connection, int channelId, int receivedSize)
+    {
+        NetworkReader reader = new NetworkReader(msgBuffer);
+        while (reader.Position < receivedSize)
+        {
+            short msgType = reader.ReadInt16();
+        }
     }
 
     protected virtual void OnStartHost()

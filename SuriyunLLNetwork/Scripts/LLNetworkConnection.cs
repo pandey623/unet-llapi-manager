@@ -13,11 +13,6 @@ public class LLNetworkConnection
         SocketId = socketId;
     }
 
-    public void HandleDataReceived(byte[] buffer, int start)
-    {
-        // TODO: May use NetworkMessage, I have to try
-    }
-
     public virtual byte Disconnect()
     {
         byte error;
